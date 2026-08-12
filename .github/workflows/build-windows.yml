@@ -7,6 +7,9 @@ on:
       - 'daily-tracker/**'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -26,7 +29,13 @@ jobs:
       - name: Build exe
         run: pyinstaller --noconfirm --onefile --windowed --name "DailyTracker" app.py
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: DailyTracker-windows
-          path: daily-tracker/dist/DailyTracker.exe
+      - name: Publish to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release view latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create latest --repo "$GITHUB_REPOSITORY" \
+              --title "DailyTracker (latest build)" \
+              --notes "Automated build from commit $GITHUB_SHA"
+          gh release upload latest dist/DailyTracker.exe --repo "$GITHUB_REPOSITORY" --clobber
