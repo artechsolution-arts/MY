@@ -1,6 +1,8 @@
 const path = require('node:path')
+const fs = require('node:fs')
 const express = require('express')
 const cookieParser = require('cookie-parser')
+const { pool } = require('./db')
 
 const app = express()
 app.set('trust proxy', 1)
@@ -26,4 +28,15 @@ app.use((req, res, next) => {
 })
 
 const port = process.env.PORT || 8787
-app.listen(port, () => console.log(`Daily Tracker API listening on :${port}`))
+
+async function migrate() {
+  const schema = fs.readFileSync(path.join(__dirname, '..', 'schema.sql'), 'utf8')
+  await pool.query(schema) // CREATE TABLE IF NOT EXISTS — safe to run on every boot
+}
+
+migrate()
+  .then(() => app.listen(port, () => console.log(`Daily Tracker API listening on :${port}`)))
+  .catch((err) => {
+    console.error('Migration failed:', err)
+    process.exit(1)
+  })
