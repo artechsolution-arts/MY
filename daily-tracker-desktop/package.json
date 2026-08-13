@@ -18,7 +18,7 @@
   "build": {
     "appId": "com.artechsolution.dailytracker",
     "productName": "DailyTracker",
-    "files": ["main.js", "build/icon.*"],
+    "files": ["main.js", "preload.js", "build/icon.*"],
     "directories": {
       "output": "dist"
     },

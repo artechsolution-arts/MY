@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification } = require('electron')
 const path = require('node:path')
 
 const APP_URL = 'https://daily-tracker-web-production.up.railway.app'
@@ -44,6 +44,7 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'),
     },
   })
 
@@ -86,6 +87,14 @@ function createTray() {
     mainWindow.focus()
   })
 }
+
+ipcMain.on('show-notification', (event, title, body) => {
+  if (!Notification.isSupported()) {
+    console.error('electron Notification module reports unsupported on this system')
+    return
+  }
+  new Notification({ title, body, icon: ICON_PATH }).show()
+})
 
 app.whenReady().then(() => {
   // Run automatically after system restart/login, starting hidden in the tray.

@@ -44,11 +44,24 @@ type DataState = {
   updateQuietHours: (q: QuietHours) => Promise<void>
 }
 
+declare global {
+  interface Window {
+    // Present only inside the Electron desktop app (see daily-tracker-desktop/preload.js).
+    // Routes through Electron's native Notification module, which reliably shows a
+    // Windows toast — the browser Web Notifications API doesn't bridge to it consistently.
+    electronNotify?: (title: string, body: string) => void
+  }
+}
+
 const DataContext = createContext<DataState | null>(null)
 
 // Only call from a real click handler — browsers require a user gesture to
 // prompt for permission; requesting on page load gets silently suppressed.
 async function notify(title: string, body: string): Promise<'shown' | 'denied' | 'unsupported'> {
+  if (typeof window !== 'undefined' && typeof window.electronNotify === 'function') {
+    window.electronNotify(title, body)
+    return 'shown'
+  }
   if (typeof Notification === 'undefined') return 'unsupported'
   let permission = Notification.permission
   if (permission === 'default') permission = await Notification.requestPermission()
