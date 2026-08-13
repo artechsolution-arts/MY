@@ -32,17 +32,21 @@ type DataState = {
   addBreak: (b: Omit<Break, 'id' | 'last_fired_ts'>) => Promise<void>
   updateBreak: (id: string, patch: Omit<Break, 'id' | 'last_fired_ts'>) => Promise<void>
   deleteBreak: (id: string) => Promise<void>
-  fireBreakNow: (id: string) => void
+  fireBreakNow: (id: string) => Promise<'shown' | 'denied' | 'unsupported'>
   nextBreak: { id: string; label: string; progress: number } | null
 }
 
 const DataContext = createContext<DataState | null>(null)
 
-function notify(title: string, body: string) {
-  if (typeof Notification === 'undefined') return
-  if (Notification.permission === 'granted') {
-    new Notification(title, { body })
-  }
+// Only call from a real click handler — browsers require a user gesture to
+// prompt for permission; requesting on page load gets silently suppressed.
+async function notify(title: string, body: string): Promise<'shown' | 'denied' | 'unsupported'> {
+  if (typeof Notification === 'undefined') return 'unsupported'
+  let permission = Notification.permission
+  if (permission === 'default') permission = await Notification.requestPermission()
+  if (permission !== 'granted') return 'denied'
+  new Notification(title, { body })
+  return 'shown'
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -53,9 +57,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [tick, setTick] = useState(0) // forces the "next break" ring to re-render each second
 
   useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission()
-    }
     Promise.all([api.get('/notes'), api.get('/reminders'), api.get('/breaks')])
       .then(([n, r, b]) => {
         setNotes(n.content ?? '')
@@ -137,9 +138,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const fireBreakNow = useCallback(
-    (id: string) => {
+    async (id: string) => {
       const b = breaks.find((x) => x.id === id)
-      if (b) notify(b.label, b.message)
+      if (!b) return 'denied' as const
+      return notify(b.label, b.message)
     },
     [breaks],
   )

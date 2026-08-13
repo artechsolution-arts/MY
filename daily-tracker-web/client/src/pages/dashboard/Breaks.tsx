@@ -62,8 +62,13 @@ function BreakForm({ initial, onSave, onCancel }: { initial: Draft; onSave: (d: 
 
 function BreakCard({ b, onEdit }: { b: Break; onEdit: () => void }) {
   const { updateBreak, deleteBreak, fireBreakNow } = useData()
+  const [testResult, setTestResult] = useState<'shown' | 'denied' | 'unsupported' | null>(null)
 
   const toggleEnabled = () => updateBreak(b.id, { label: b.label, enabled: !b.enabled, interval_min: b.interval_min, message: b.message })
+
+  const test = async () => {
+    setTestResult(await fireBreakNow(b.id))
+  }
 
   return (
     <div className="rounded-2xl border border-line bg-surface overflow-hidden flex">
@@ -88,9 +93,18 @@ function BreakCard({ b, onEdit }: { b: Break; onEdit: () => void }) {
         <p className="text-xs text-muted font-mono mb-2">Every {b.interval_min} minutes</p>
         <p className="text-sm text-ink mb-4">{b.message}</p>
 
-        <Button variant="secondary" onClick={() => fireBreakNow(b.id)} type="button">
-          Test now
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="secondary" onClick={test} type="button">
+            Test now
+          </Button>
+          {testResult === 'shown' && <span className="text-xs text-accent">Notification sent — check your system tray.</span>}
+          {testResult === 'denied' && (
+            <span className="text-xs text-red-600">
+              Notifications are blocked. Enable them for this site in your browser's settings, then try again.
+            </span>
+          )}
+          {testResult === 'unsupported' && <span className="text-xs text-muted">This browser doesn't support notifications.</span>}
+        </div>
       </div>
     </div>
   )
@@ -108,7 +122,7 @@ export function Breaks() {
         <h1 className="font-display text-2xl text-ink">Breaks</h1>
         {editingId === null && <Button onClick={() => setEditingId('new')}>Add break</Button>}
       </div>
-      <p className="text-sm text-muted mb-6">Notifications need permission from your browser the first time you visit.</p>
+      <p className="text-sm text-muted mb-6">The first time you click "Test now," your browser will ask permission to show notifications.</p>
 
       <div className="space-y-4">
         {editingId === 'new' && (
