@@ -74,7 +74,7 @@ function BreakCard({ b, onEdit }: { b: Break; onEdit: () => void }) {
     <div className="rounded-2xl border border-line bg-surface overflow-hidden flex">
       <div className="w-1 bg-primary shrink-0" />
       <div className="p-5 flex-1">
-        <div className="flex items-center justify-between mb-3 gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3">
           <h3 className="font-display text-lg text-ink truncate">{b.label}</h3>
           <div className="flex items-center gap-4 shrink-0">
             <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
@@ -93,7 +93,7 @@ function BreakCard({ b, onEdit }: { b: Break; onEdit: () => void }) {
         <p className="text-xs text-muted font-mono mb-2">Every {b.interval_min} minutes</p>
         <p className="text-sm text-ink mb-4">{b.message}</p>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button variant="secondary" onClick={test} type="button">
             Test now
           </Button>
