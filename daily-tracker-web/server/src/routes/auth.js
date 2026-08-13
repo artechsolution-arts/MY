@@ -23,10 +23,10 @@ router.post('/signup', async (req, res) => {
     )
     const user = rows[0]
     await client.query('INSERT INTO notes (user_id, content) VALUES ($1, $2)', [user.id, ''])
-    for (const [type, defaults] of Object.entries(DEFAULT_BREAKS)) {
+    for (const b of DEFAULT_BREAKS) {
       await client.query(
-        'INSERT INTO breaks (user_id, type, label, interval_min, message) VALUES ($1, $2, $3, $4, $5)',
-        [user.id, type, defaults.label, defaults.interval_min, defaults.message],
+        'INSERT INTO breaks (user_id, label, interval_min, message) VALUES ($1, $2, $3, $4)',
+        [user.id, b.label, b.interval_min, b.message],
       )
     }
     await client.query('COMMIT')
