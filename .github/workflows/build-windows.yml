@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build exe
+      - name: Build installer
         run: npm run build:win
 
       - name: Publish to release
@@ -38,4 +38,8 @@ jobs:
             gh release create latest --repo "$GITHUB_REPOSITORY" \
               --title "DailyTracker (latest build)" \
               --notes "Automated build from commit $GITHUB_SHA"
-          gh release upload latest dist/DailyTracker.exe --repo "$GITHUB_REPOSITORY" --clobber
+          # DailyTracker.exe (portable, no notifications) retired in favor of an
+          # installer -- required for Windows to register the AppUserModelID
+          # that native toast notifications depend on.
+          gh release delete-asset latest DailyTracker.exe --repo "$GITHUB_REPOSITORY" --yes || true
+          gh release upload latest dist/DailyTracker-Setup.exe --repo "$GITHUB_REPOSITORY" --clobber

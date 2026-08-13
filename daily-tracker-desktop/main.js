@@ -3,6 +3,14 @@ const path = require('node:path')
 
 const APP_URL = 'https://daily-tracker-web-production.up.railway.app'
 const ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+const APP_USER_MODEL_ID = 'com.artechsolution.dailytracker'
+
+// Required for Windows to show native toast notifications at all — without a
+// matching AppUserModelID (normally set up by an installer's Start Menu
+// shortcut), Windows silently drops them with no error.
+if (process.platform === 'win32') {
+  app.setAppUserModelId(APP_USER_MODEL_ID)
+}
 
 let mainWindow = null
 let tray = null
