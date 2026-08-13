@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 import pystray
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageTk
 
 from scheduler_logic import due_break, due_reminder
 
@@ -30,14 +30,14 @@ SETTINGS_PATH = os.path.join(get_data_dir(), 'settings.json')
 DEFAULT_SETTINGS = {
     "notes": "",
     "reminders": [],
-    "breaks": {
-        "breathe": {"label": "Breathing break", "enabled": True, "interval_min": 20,
-                    "message": "Take a breath. Relax your shoulders and eyes for a moment.", "last_fired_ts": 0},
-        "rest": {"label": "Rest break", "enabled": True, "interval_min": 60,
-                 "message": "Time to rest for about 15 minutes.", "last_fired_ts": 0},
-        "stand": {"label": "Stand break", "enabled": True, "interval_min": 30,
-                  "message": "Stand up and stretch for about 10 minutes.", "last_fired_ts": 0},
-    },
+    "breaks": [
+        {"label": "Breathing break", "enabled": True, "interval_min": 20,
+         "message": "Take a breath. Relax your shoulders and eyes for a moment.", "last_fired_ts": 0},
+        {"label": "Rest break", "enabled": True, "interval_min": 60,
+         "message": "Time to rest for about 15 minutes.", "last_fired_ts": 0},
+        {"label": "Stand break", "enabled": True, "interval_min": 30,
+         "message": "Stand up and stretch for about 10 minutes.", "last_fired_ts": 0},
+    ],
 }
 
 
@@ -48,9 +48,11 @@ def load_settings():
                 data = json.load(f)
             merged = json.loads(json.dumps(DEFAULT_SETTINGS))
             merged.update({k: v for k, v in data.items() if k != 'breaks'})
-            if 'breaks' in data:
-                for k, v in data['breaks'].items():
-                    merged['breaks'].setdefault(k, {}).update(v)
+            breaks = data.get('breaks')
+            if isinstance(breaks, dict):
+                merged['breaks'] = list(breaks.values())  # upgrade from the old fixed breathe/rest/stand shape
+            elif isinstance(breaks, list):
+                merged['breaks'] = breaks
             return merged
         except Exception:
             pass
@@ -65,19 +67,47 @@ def save_settings(settings):
 
 
 COLORS = {
-    'bg': '#ECFEFF',
+    # Matches the web app's design tokens (daily-tracker-web/client/src/index.css)
+    'bg': '#F6FAFB',
     'surface': '#FFFFFF',
-    'primary': '#0891B2',
-    'primary_dark': '#0E7490',
-    'primary_tint': '#CFFAFE',
-    'success': '#059669',
-    'success_dark': '#047857',
-    'text': '#164E63',
-    'text_muted': '#475569',
-    'border': '#A5F3FC',
-    'border_light': '#E2E8F0',
+    'primary': '#0E8A9C',
+    'primary_dark': '#0B6B79',
+    'primary_tint': '#E3F3F5',
+    'success': '#3FA37A',
+    'success_dark': '#2F8562',
+    'text': '#10343E',
+    'text_muted': '#5B7480',
+    'border': '#CFE3E5',
+    'border_light': '#E2EBEC',
 }
 FONT = 'Segoe UI'
+
+
+def _hex_to_rgb(h):
+    return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def make_ring_image(size=32):
+    # The web app's signature element: a soft radial gradient orb, off-center
+    # highlight (matches the CSS `radial-gradient(circle at 35% 30%, ...)`).
+    base = 48
+    tint = _hex_to_rgb(COLORS['primary_tint'])
+    primary = _hex_to_rgb(COLORS['primary'])
+    bg = _hex_to_rgb(COLORS['bg'])
+    img = Image.new('RGB', (base, base), bg)
+    cx, cy = base * 0.35, base * 0.30
+    max_r = base * 0.75
+    center = base / 2
+    radius = base / 2 - 1
+    for y in range(base):
+        for x in range(base):
+            if ((x - center) ** 2 + (y - center) ** 2) ** 0.5 > radius:
+                continue
+            g = max(0.0, min(1.0, ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5 / max_r))
+            pixel = tuple(int(tint[i] + (primary[i] - tint[i]) * g) for i in range(3))
+            img.putpixel((x, y), pixel)
+    img = img.resize((size, size), Image.LANCZOS)
+    return ImageTk.PhotoImage(img)
 
 
 def apply_theme(root):
@@ -156,9 +186,9 @@ class Scheduler(threading.Thread):
             now_ts = time.time()
             changed = False
             with self.lock:
-                for key, b in self.settings['breaks'].items():
+                for b in self.settings['breaks']:
                     if b.get('enabled') and due_break(b.get('last_fired_ts', 0), b.get('interval_min', 0), now_ts):
-                        notify(b.get('label', key.title()), b.get('message', ''))
+                        notify(b.get('label', 'Break'), b.get('message', ''))
                         b['last_fired_ts'] = now_ts
                         changed = True
                 for r in self.settings['reminders']:
@@ -187,7 +217,11 @@ class App:
 
         header = ttk.Frame(root, style='Header.TFrame', padding=(20, 16, 20, 8))
         header.pack(fill='x')
-        ttk.Label(header, text='Daily Tracker', style='Title.TLabel').pack(anchor='w')
+        title_row = ttk.Frame(header, style='Header.TFrame')
+        title_row.pack(anchor='w')
+        self._header_ring_img = make_ring_image(28)  # kept on self — tkinter drops PhotoImages without a live ref
+        tk.Label(title_row, image=self._header_ring_img, bg=COLORS['bg'], bd=0).pack(side='left', padx=(0, 8))
+        ttk.Label(title_row, text='Daily Tracker', style='Title.TLabel').pack(side='left')
         ttk.Label(header, text='Notes, reminders and healthy break nudges', style='Subtitle.TLabel').pack(anchor='w')
 
         nb = ttk.Notebook(root)
@@ -326,12 +360,22 @@ class App:
     # --- Breaks ---
     def build_breaks_tab(self):
         frame = self.breaks_tab
-        outer = ttk.Frame(frame, style='Surface.TFrame', padding=16)
-        outer.pack(fill='both', expand=True)
+        header = ttk.Frame(frame, style='Surface.TFrame', padding=(16, 16, 16, 0))
+        header.pack(fill='x')
+        ttk.Button(header, text='Add break', command=self.add_break).pack(anchor='e')
 
+        self.breaks_outer = ttk.Frame(frame, style='Surface.TFrame', padding=(16, 8, 16, 16))
+        self.breaks_outer.pack(fill='both', expand=True)
+
+        self.refresh_breaks()
+
+    def refresh_breaks(self):
+        for child in self.breaks_outer.winfo_children():
+            child.destroy()
         self.break_vars = {}
-        for key, b in self.settings['breaks'].items():
-            card = tk.Frame(outer, bg=COLORS['surface'], highlightthickness=1,
+
+        for idx, b in enumerate(self.settings['breaks']):
+            card = tk.Frame(self.breaks_outer, bg=COLORS['surface'], highlightthickness=1,
                              highlightbackground=COLORS['border_light'])
             card.pack(fill='x', pady=(0, 12))
             accent = tk.Frame(card, bg=COLORS['primary'], width=4)
@@ -340,7 +384,11 @@ class App:
             body.pack(side='left', fill='both', expand=True)
             body.columnconfigure(1, weight=1)
 
-            ttk.Label(body, text=b['label'], style='CardTitle.TLabel').grid(row=0, column=0, sticky='w', columnspan=2)
+            label_var = tk.StringVar(value=b['label'])
+            ttk.Entry(body, textvariable=label_var, font=(FONT, 11, 'bold')).grid(row=0, column=0, sticky='we')
+
+            ttk.Button(body, text='Delete', style='Secondary.TButton',
+                       command=lambda i=idx: self.delete_break(i)).grid(row=0, column=1, sticky='e', padx=(8, 0))
 
             enabled_var = tk.BooleanVar(value=b['enabled'])
             ttk.Checkbutton(body, text='Enabled', variable=enabled_var, style='Surface.TCheckbutton') \
@@ -358,18 +406,61 @@ class App:
             ttk.Entry(body, textvariable=msg_var).grid(row=2, column=0, columnspan=2, sticky='we', pady=(0, 4))
 
             ttk.Button(body, text='Test now', style='Secondary.TButton',
-                       command=lambda mv=msg_var, lbl=b['label']: notify(lbl, mv.get())) \
+                       command=lambda mv=msg_var, lv=label_var: notify(lv.get(), mv.get())) \
                 .grid(row=3, column=0, sticky='w', pady=(6, 0))
 
-            self.break_vars[key] = (enabled_var, interval_var, msg_var)
+            self.break_vars[idx] = (label_var, enabled_var, interval_var, msg_var)
 
-        ttk.Button(outer, text='Save break settings', style='Success.TButton', command=self.save_breaks) \
+        ttk.Button(self.breaks_outer, text='Save break settings', style='Success.TButton', command=self.save_breaks) \
             .pack(anchor='w', pady=(4, 0))
+
+    def add_break(self):
+        self.break_dialog()
+
+    def delete_break(self, idx):
+        with self.lock:
+            del self.settings['breaks'][idx]
+            save_settings(self.settings)
+        self.refresh_breaks()
+
+    def break_dialog(self):
+        win = tk.Toplevel(self.root, bg=COLORS['surface'])
+        win.title('Add break')
+        win.resizable(False, False)
+        win.grab_set()
+
+        ttk.Label(win, text='Name', style='Surface.TLabel').grid(row=0, column=0, sticky='w', padx=12, pady=(12, 4))
+        label_var = tk.StringVar(value='')
+        ttk.Entry(win, textvariable=label_var, width=30).grid(row=0, column=1, padx=12, pady=(12, 4))
+
+        ttk.Label(win, text='Every (minutes)', style='Surface.TLabel').grid(row=1, column=0, sticky='w', padx=12, pady=4)
+        interval_var = tk.IntVar(value=20)
+        ttk.Spinbox(win, from_=1, to=480, textvariable=interval_var, width=27).grid(row=1, column=1, padx=12, pady=4)
+
+        ttk.Label(win, text='Message', style='Surface.TLabel').grid(row=2, column=0, sticky='w', padx=12, pady=4)
+        msg_var = tk.StringVar(value='')
+        ttk.Entry(win, textvariable=msg_var, width=30).grid(row=2, column=1, padx=12, pady=4)
+
+        def on_save():
+            label = label_var.get().strip()
+            if not label:
+                messagebox.showerror('Name required', 'Give this break a name.')
+                return
+            new = {'label': label, 'enabled': True, 'interval_min': max(1, interval_var.get()),
+                   'message': msg_var.get().strip() or 'Time for a break.', 'last_fired_ts': 0}
+            with self.lock:
+                self.settings['breaks'].append(new)
+                save_settings(self.settings)
+            self.refresh_breaks()
+            win.destroy()
+
+        ttk.Button(win, text='Save', command=on_save).grid(row=3, column=0, columnspan=2, pady=12)
 
     def save_breaks(self):
         with self.lock:
-            for key, (ev, iv, mv) in self.break_vars.items():
-                b = self.settings['breaks'][key]
+            for idx, (lv, ev, iv, mv) in self.break_vars.items():
+                b = self.settings['breaks'][idx]
+                b['label'] = lv.get().strip() or b['label']
                 b['enabled'] = ev.get()
                 b['interval_min'] = max(1, iv.get())
                 b['message'] = mv.get()
@@ -387,7 +478,7 @@ class App:
 def make_icon_image():
     img = Image.new('RGB', (64, 64), 'white')
     d = ImageDraw.Draw(img)
-    d.ellipse((8, 8, 56, 56), fill=(8, 145, 178))  # matches COLORS['primary']
+    d.ellipse((8, 8, 56, 56), fill=(14, 138, 156))  # matches COLORS['primary']
     d.text((22, 24), 'DT', fill='white')
     return img
 
