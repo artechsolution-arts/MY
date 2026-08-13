@@ -22,6 +22,7 @@ export default function App() {
             <Route path="reminders" element={<Reminders />} />
             <Route path="breaks" element={<Breaks />} />
           </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
