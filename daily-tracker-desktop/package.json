@@ -1,0 +1,33 @@
+{
+  "name": "daily-tracker-desktop",
+  "version": "1.0.0",
+  "description": "Daily Tracker desktop app — a dedicated window onto the web app with a tray icon and native notifications.",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win --x64"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.artechsolution.dailytracker",
+    "productName": "DailyTracker",
+    "files": ["main.js", "build/icon.*"],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "portable",
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "DailyTracker.exe"
+    }
+  }
+}

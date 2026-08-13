@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'daily-tracker/**'
+      - 'daily-tracker-desktop/**'
   workflow_dispatch:
 
 permissions:
@@ -15,19 +15,19 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: daily-tracker
+        working-directory: daily-tracker-desktop
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
+          node-version: '20'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: npm install
 
       - name: Build exe
-        run: pyinstaller --noconfirm --onefile --windowed --name "DailyTracker" app.py
+        run: npm run build:win
 
       - name: Publish to release
         env:
