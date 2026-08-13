@@ -1,6 +1,76 @@
-import { useState } from 'react'
-import { useData, type Break } from '../../lib/data'
+import { useEffect, useState } from 'react'
+import { useData, type Break, type QuietHours } from '../../lib/data'
 import { Button, Input, Label } from '../../components/ui'
+
+function QuietHoursPanel() {
+  const { quietHours, updateQuietHours } = useData()
+  const [draft, setDraft] = useState<QuietHours | null>(quietHours)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => setDraft(quietHours), [quietHours])
+
+  if (!draft) return null
+  const dirty = JSON.stringify(draft) !== JSON.stringify(quietHours)
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await updateQuietHours(draft)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-5 mb-4">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-display text-lg text-ink">Quiet hours</h3>
+        <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
+          <input
+            type="checkbox"
+            checked={draft.quiet_hours_enabled}
+            onChange={(e) => setDraft({ ...draft, quiet_hours_enabled: e.target.checked })}
+            className="accent-primary"
+          />
+          Enabled
+        </label>
+      </div>
+      <p className="text-sm text-muted mb-4">
+        Pause break nudges during this window. Reminders still fire — those are appointments you set for a specific time.
+      </p>
+      <div className="flex flex-wrap items-center gap-3 mb-3">
+        <span className="text-sm text-muted">From</span>
+        <Input
+          type="time"
+          value={draft.quiet_hours_start}
+          onChange={(e) => setDraft({ ...draft, quiet_hours_start: e.target.value })}
+          className="w-32"
+        />
+        <span className="text-sm text-muted">to</span>
+        <Input
+          type="time"
+          value={draft.quiet_hours_end}
+          onChange={(e) => setDraft({ ...draft, quiet_hours_end: e.target.value })}
+          className="w-32"
+        />
+      </div>
+      <label className="flex items-center gap-2 text-sm text-muted cursor-pointer mb-4">
+        <input
+          type="checkbox"
+          checked={draft.quiet_hours_skip_weekends}
+          onChange={(e) => setDraft({ ...draft, quiet_hours_skip_weekends: e.target.checked })}
+          className="accent-primary"
+        />
+        Also skip weekends entirely
+      </label>
+      {dirty && (
+        <Button onClick={save} disabled={saving} type="button">
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      )}
+    </div>
+  )
+}
 
 type Draft = Omit<Break, 'id' | 'last_fired_ts'>
 const EMPTY: Draft = { label: '', enabled: true, interval_min: 20, message: '' }
@@ -123,6 +193,8 @@ export function Breaks() {
         {editingId === null && <Button onClick={() => setEditingId('new')}>Add break</Button>}
       </div>
       <p className="text-sm text-muted mb-6">The first time you click "Test now," your browser will ask permission to show notifications.</p>
+
+      <QuietHoursPanel />
 
       <div className="space-y-4">
         {editingId === 'new' && (

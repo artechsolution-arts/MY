@@ -14,6 +14,7 @@ app.use('/api/auth', require('./routes/auth'))
 app.use('/api/notes', require('./routes/notes'))
 app.use('/api/reminders', require('./routes/reminders'))
 app.use('/api/breaks', require('./routes/breaks'))
+app.use('/api/settings', require('./routes/settings'))
 
 app.use((err, req, res, next) => {
   console.error(err)

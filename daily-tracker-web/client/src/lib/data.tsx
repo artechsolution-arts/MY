@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from './api'
-import { dueBreak, dueReminder, breakProgress } from './scheduler'
+import { dueBreak, dueReminder, breakProgress, inQuietHours } from './scheduler'
 
 export type Break = {
   id: string
@@ -18,6 +18,12 @@ export type Reminder = {
   enabled: boolean
   last_fired_date: string | null
 }
+export type QuietHours = {
+  quiet_hours_enabled: boolean
+  quiet_hours_start: string
+  quiet_hours_end: string
+  quiet_hours_skip_weekends: boolean
+}
 
 type DataState = {
   loading: boolean
@@ -34,6 +40,8 @@ type DataState = {
   deleteBreak: (id: string) => Promise<void>
   fireBreakNow: (id: string) => Promise<'shown' | 'denied' | 'unsupported'>
   nextBreak: { id: string; label: string; progress: number } | null
+  quietHours: QuietHours | null
+  updateQuietHours: (q: QuietHours) => Promise<void>
 }
 
 const DataContext = createContext<DataState | null>(null)
@@ -54,14 +62,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState('')
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [breaks, setBreaks] = useState<Break[]>([])
+  const [quietHours, setQuietHours] = useState<QuietHours | null>(null)
   const [tick, setTick] = useState(0) // forces the "next break" ring to re-render each second
 
   useEffect(() => {
-    Promise.all([api.get('/notes'), api.get('/reminders'), api.get('/breaks')])
-      .then(([n, r, b]) => {
+    Promise.all([api.get('/notes'), api.get('/reminders'), api.get('/breaks'), api.get('/settings')])
+      .then(([n, r, b, s]) => {
         setNotes(n.content ?? '')
         setReminders(r.reminders ?? [])
         setBreaks(b.breaks ?? [])
+        setQuietHours(s.quietHours ?? null)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -76,13 +86,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   breaksRef.current = breaks
   const remindersRef = useRef(reminders)
   remindersRef.current = reminders
+  const quietHoursRef = useRef(quietHours)
+  quietHoursRef.current = quietHours
 
   useEffect(() => {
     const check = () => {
       const now = new Date()
       const nowTs = Date.now() / 1000
+      const q = quietHoursRef.current
+      const quiet = q ? inQuietHours(now, q.quiet_hours_enabled, q.quiet_hours_start, q.quiet_hours_end, q.quiet_hours_skip_weekends) : false
+      // Quiet hours only mute breaks (ambient nudges) — reminders are explicit appointments the user set for that exact time.
       breaksRef.current.forEach((b) => {
-        if (b.enabled && dueBreak(b.last_fired_ts, b.interval_min, nowTs)) {
+        if (!quiet && b.enabled && dueBreak(b.last_fired_ts, b.interval_min, nowTs)) {
           notify(b.label, b.message)
           api.post(`/breaks/${b.id}/fire`).then((res) => {
             setBreaks((prev) => prev.map((x) => (x.id === b.id ? { ...x, last_fired_ts: res.last_fired_ts } : x)))
@@ -146,6 +161,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [breaks],
   )
 
+  const updateQuietHours = useCallback(async (q: QuietHours) => {
+    const { quietHours: updated } = await api.put('/settings', q)
+    setQuietHours(updated)
+  }, [])
+
   let nextBreak: DataState['nextBreak'] = null
   const nowTs = Date.now() / 1000
   for (const b of breaks) {
@@ -172,6 +192,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         deleteBreak,
         fireBreakNow,
         nextBreak,
+        quietHours,
+        updateQuietHours,
       }}
     >
       {children}

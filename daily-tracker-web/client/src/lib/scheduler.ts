@@ -19,3 +19,20 @@ export function breakProgress(lastFiredTs: number, intervalMin: number, nowTs: n
   const elapsed = nowTs - lastFiredTs
   return Math.min(1, Math.max(0, elapsed / (intervalMin * 60)))
 }
+
+/** Whether break notifications should stay silent right now (reminders are unaffected — those are explicit appointments, not ambient nudges). */
+export function inQuietHours(now: Date, enabled: boolean, start: string, end: string, skipWeekends: boolean): boolean {
+  if (!enabled) return false
+  const day = now.getDay() // 0 = Sunday, 6 = Saturday
+  if (skipWeekends && (day === 0 || day === 6)) return true
+
+  const [startH, startM] = start.split(':').map(Number)
+  const [endH, endM] = end.split(':').map(Number)
+  const startMin = startH * 60 + startM
+  const endMin = endH * 60 + endM
+  const curMin = now.getHours() * 60 + now.getMinutes()
+
+  if (startMin === endMin) return false // zero-width window = never quiet
+  if (startMin < endMin) return curMin >= startMin && curMin < endMin
+  return curMin >= startMin || curMin < endMin // window wraps past midnight
+}
