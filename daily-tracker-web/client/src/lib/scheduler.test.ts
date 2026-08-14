@@ -1,5 +1,5 @@
 import assert from 'node:assert'
-import { dueBreak, dueReminder, breakProgress, inQuietHours } from './scheduler.ts'
+import { dueBreak, dueReminder, breakProgress, inQuietHours, dueMotivationStartup } from './scheduler.ts'
 
 assert.strictEqual(dueBreak(0, 20, 20 * 60), true)
 assert.strictEqual(dueBreak(0, 20, 19 * 60), false)
@@ -28,5 +28,9 @@ assert.strictEqual(inQuietHours(saturdayNoon, true, '21:00', '08:00', true), tru
 assert.strictEqual(inQuietHours(saturdayNoon, true, '21:00', '08:00', false), false) // weekend but not skipped, outside window
 assert.strictEqual(inQuietHours(weekdayNoon, true, '09:00', '17:00', false), true) // normal (non-wrapping) window, inside
 assert.strictEqual(inQuietHours(weekdayNoon, true, '09:00', '09:00', false), false) // zero-width window never quiet
+
+assert.strictEqual(dueMotivationStartup(null, now), true) // never fired
+assert.strictEqual(dueMotivationStartup('2026-08-12', now), false) // already fired today
+assert.strictEqual(dueMotivationStartup('2026-08-11', now), true) // fired yesterday, due again
 
 console.log('OK')

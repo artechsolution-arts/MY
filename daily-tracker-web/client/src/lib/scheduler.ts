@@ -6,11 +6,19 @@ export function dueBreak(lastFiredTs: number, intervalMin: number, nowTs: number
   return nowTs - lastFiredTs >= intervalMin * 60
 }
 
+export function dateStr(now: Date): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 export function dueReminder(timeStr: string, lastFiredDate: string | null, now: Date): boolean {
   const hh = String(now.getHours()).padStart(2, '0')
   const mm = String(now.getMinutes()).padStart(2, '0')
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  return `${hh}:${mm}` === timeStr && lastFiredDate !== today
+  return `${hh}:${mm}` === timeStr && lastFiredDate !== dateStr(now)
+}
+
+/** Once-a-day "start your day" greeting — due any time it hasn't already fired today. */
+export function dueMotivationStartup(lastFiredDate: string | null, now: Date): boolean {
+  return lastFiredDate !== dateStr(now)
 }
 
 /** 0..1 progress toward a break's next firing, for the breathing-ring arc. */

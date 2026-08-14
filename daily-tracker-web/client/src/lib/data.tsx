@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from './api'
-import { dueBreak, dueReminder, breakProgress, inQuietHours } from './scheduler'
+import { dueBreak, dueReminder, breakProgress, inQuietHours, dueMotivationStartup } from './scheduler'
+import { randomQuote } from './quotes'
 
 export type Break = {
   id: string
@@ -18,12 +19,21 @@ export type Reminder = {
   enabled: boolean
   last_fired_date: string | null
 }
-export type QuietHours = {
+export type Settings = {
   quiet_hours_enabled: boolean
   quiet_hours_start: string
   quiet_hours_end: string
   quiet_hours_skip_weekends: boolean
+  motivation_enabled: boolean
+  motivation_on_startup: boolean
+  motivation_interval_min: number
+  motivation_last_fired_date: string | null
+  motivation_last_fired_ts: number
 }
+export type SettingsPatch = Pick<
+  Settings,
+  'quiet_hours_enabled' | 'quiet_hours_start' | 'quiet_hours_end' | 'quiet_hours_skip_weekends' | 'motivation_enabled' | 'motivation_on_startup' | 'motivation_interval_min'
+>
 
 type DataState = {
   loading: boolean
@@ -40,8 +50,8 @@ type DataState = {
   deleteBreak: (id: string) => Promise<void>
   fireBreakNow: (id: string) => Promise<'shown' | 'denied' | 'unsupported'>
   nextBreak: { id: string; label: string; progress: number } | null
-  quietHours: QuietHours | null
-  updateQuietHours: (q: QuietHours) => Promise<void>
+  settings: Settings | null
+  updateSettings: (s: SettingsPatch) => Promise<void>
 }
 
 declare global {
@@ -75,7 +85,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState('')
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [breaks, setBreaks] = useState<Break[]>([])
-  const [quietHours, setQuietHours] = useState<QuietHours | null>(null)
+  const [settings, setSettings] = useState<Settings | null>(null)
   const [tick, setTick] = useState(0) // forces the "next break" ring to re-render each second
 
   useEffect(() => {
@@ -84,7 +94,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setNotes(n.content ?? '')
         setReminders(r.reminders ?? [])
         setBreaks(b.breaks ?? [])
-        setQuietHours(s.quietHours ?? null)
+        setSettings(s.settings ?? null)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -94,21 +104,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(id)
   }, [])
 
-  // live scheduler: check every 15s whether a break or reminder is due
+  // live scheduler: check every 15s whether a break, reminder, or motivation nudge is due
   const breaksRef = useRef(breaks)
   breaksRef.current = breaks
   const remindersRef = useRef(reminders)
   remindersRef.current = reminders
-  const quietHoursRef = useRef(quietHours)
-  quietHoursRef.current = quietHours
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
 
   useEffect(() => {
     const check = () => {
       const now = new Date()
       const nowTs = Date.now() / 1000
-      const q = quietHoursRef.current
-      const quiet = q ? inQuietHours(now, q.quiet_hours_enabled, q.quiet_hours_start, q.quiet_hours_end, q.quiet_hours_skip_weekends) : false
-      // Quiet hours only mute breaks (ambient nudges) — reminders are explicit appointments the user set for that exact time.
+      const s = settingsRef.current
+      const quiet = s ? inQuietHours(now, s.quiet_hours_enabled, s.quiet_hours_start, s.quiet_hours_end, s.quiet_hours_skip_weekends) : false
+
+      // Quiet hours only mute breaks and motivation nudges (ambient) — reminders are explicit appointments the user set for that exact time.
       breaksRef.current.forEach((b) => {
         if (!quiet && b.enabled && dueBreak(b.last_fired_ts, b.interval_min, nowTs)) {
           notify(b.label, b.message)
@@ -117,6 +128,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           })
         }
       })
+
       remindersRef.current.forEach((r) => {
         if (r.enabled && dueReminder(r.time, r.last_fired_date, now)) {
           notify(`${r.category}: ${r.title}`, r.title)
@@ -126,6 +138,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
           })
         }
       })
+
+      if (s && s.motivation_enabled && !quiet) {
+        const dueStartup = s.motivation_on_startup && dueMotivationStartup(s.motivation_last_fired_date, now)
+        const dueInterval = !dueStartup && dueBreak(s.motivation_last_fired_ts, s.motivation_interval_min, nowTs)
+        if (dueStartup || dueInterval) {
+          notify(dueStartup ? 'Start the day' : 'Keep going', randomQuote())
+          api.post('/settings/motivation/fire').then((res) => {
+            setSettings((prev) =>
+              prev
+                ? { ...prev, motivation_last_fired_date: res.motivation_last_fired_date, motivation_last_fired_ts: res.motivation_last_fired_ts }
+                : prev,
+            )
+          })
+        }
+      }
     }
     const id = setInterval(check, 15000)
     return () => clearInterval(id)
@@ -174,9 +201,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [breaks],
   )
 
-  const updateQuietHours = useCallback(async (q: QuietHours) => {
-    const { quietHours: updated } = await api.put('/settings', q)
-    setQuietHours(updated)
+  const updateSettings = useCallback(async (patch: SettingsPatch) => {
+    const { settings: updated } = await api.put('/settings', patch)
+    setSettings(updated)
   }, [])
 
   let nextBreak: DataState['nextBreak'] = null
@@ -205,8 +232,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         deleteBreak,
         fireBreakNow,
         nextBreak,
-        quietHours,
-        updateQuietHours,
+        settings,
+        updateSettings,
       }}
     >
       {children}

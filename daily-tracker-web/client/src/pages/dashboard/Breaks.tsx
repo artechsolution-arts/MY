@@ -1,68 +1,114 @@
 import { useEffect, useState } from 'react'
-import { useData, type Break, type QuietHours } from '../../lib/data'
+import { useData, type Break, type SettingsPatch } from '../../lib/data'
 import { Button, Input, Label } from '../../components/ui'
 
-function QuietHoursPanel() {
-  const { quietHours, updateQuietHours } = useData()
-  const [draft, setDraft] = useState<QuietHours | null>(quietHours)
+function toPatch(s: SettingsPatch): SettingsPatch {
+  const { quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_skip_weekends, motivation_enabled, motivation_on_startup, motivation_interval_min } = s
+  return { quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_skip_weekends, motivation_enabled, motivation_on_startup, motivation_interval_min }
+}
+
+function SettingsPanel() {
+  const { settings, updateSettings } = useData()
+  const [draft, setDraft] = useState<SettingsPatch | null>(settings && toPatch(settings))
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => setDraft(quietHours), [quietHours])
+  useEffect(() => setDraft(settings && toPatch(settings)), [settings])
 
   if (!draft) return null
-  const dirty = JSON.stringify(draft) !== JSON.stringify(quietHours)
+  const dirty = JSON.stringify(draft) !== JSON.stringify(settings && toPatch(settings))
 
   const save = async () => {
     setSaving(true)
     try {
-      await updateQuietHours(draft)
+      await updateSettings(draft)
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 mb-4">
-      <div className="flex items-center justify-between mb-1">
-        <h3 className="font-display text-lg text-ink">Quiet hours</h3>
+    <div className="rounded-2xl border border-line bg-surface p-5 mb-4 space-y-6">
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-display text-lg text-ink">Quiet hours</h3>
+          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.quiet_hours_enabled}
+              onChange={(e) => setDraft({ ...draft, quiet_hours_enabled: e.target.checked })}
+              className="accent-primary"
+            />
+            Enabled
+          </label>
+        </div>
+        <p className="text-sm text-muted mb-4">
+          Pause break and motivation nudges during this window. Reminders still fire — those are appointments you set for a specific time.
+        </p>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <span className="text-sm text-muted">From</span>
+          <Input
+            type="time"
+            value={draft.quiet_hours_start}
+            onChange={(e) => setDraft({ ...draft, quiet_hours_start: e.target.value })}
+            className="w-32"
+          />
+          <span className="text-sm text-muted">to</span>
+          <Input
+            type="time"
+            value={draft.quiet_hours_end}
+            onChange={(e) => setDraft({ ...draft, quiet_hours_end: e.target.value })}
+            className="w-32"
+          />
+        </div>
         <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
           <input
             type="checkbox"
-            checked={draft.quiet_hours_enabled}
-            onChange={(e) => setDraft({ ...draft, quiet_hours_enabled: e.target.checked })}
+            checked={draft.quiet_hours_skip_weekends}
+            onChange={(e) => setDraft({ ...draft, quiet_hours_skip_weekends: e.target.checked })}
             className="accent-primary"
           />
-          Enabled
+          Also skip weekends entirely
         </label>
       </div>
-      <p className="text-sm text-muted mb-4">
-        Pause break nudges during this window. Reminders still fire — those are appointments you set for a specific time.
-      </p>
-      <div className="flex flex-wrap items-center gap-3 mb-3">
-        <span className="text-sm text-muted">From</span>
-        <Input
-          type="time"
-          value={draft.quiet_hours_start}
-          onChange={(e) => setDraft({ ...draft, quiet_hours_start: e.target.value })}
-          className="w-32"
-        />
-        <span className="text-sm text-muted">to</span>
-        <Input
-          type="time"
-          value={draft.quiet_hours_end}
-          onChange={(e) => setDraft({ ...draft, quiet_hours_end: e.target.value })}
-          className="w-32"
-        />
+
+      <div className="border-t border-line pt-6">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-display text-lg text-ink">Daily motivation</h3>
+          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.motivation_enabled}
+              onChange={(e) => setDraft({ ...draft, motivation_enabled: e.target.checked })}
+              className="accent-primary"
+            />
+            Enabled
+          </label>
+        </div>
+        <p className="text-sm text-muted mb-4">A short line to get moving — once when you start the day, then again on a timer.</p>
+        <label className="flex items-center gap-2 text-sm text-muted cursor-pointer mb-3">
+          <input
+            type="checkbox"
+            checked={draft.motivation_on_startup}
+            onChange={(e) => setDraft({ ...draft, motivation_on_startup: e.target.checked })}
+            className="accent-primary"
+          />
+          Send one the first time I open the app each day
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm text-muted">Then every</span>
+          <Input
+            type="number"
+            aria-label="Motivation interval in hours"
+            min={1}
+            max={12}
+            value={Math.round(draft.motivation_interval_min / 60)}
+            onChange={(e) => setDraft({ ...draft, motivation_interval_min: Math.max(15, Math.min(720, Number(e.target.value) * 60)) })}
+            className="w-20 font-mono"
+          />
+          <span className="text-sm text-muted">hours</span>
+        </div>
       </div>
-      <label className="flex items-center gap-2 text-sm text-muted cursor-pointer mb-4">
-        <input
-          type="checkbox"
-          checked={draft.quiet_hours_skip_weekends}
-          onChange={(e) => setDraft({ ...draft, quiet_hours_skip_weekends: e.target.checked })}
-          className="accent-primary"
-        />
-        Also skip weekends entirely
-      </label>
+
       {dirty && (
         <Button onClick={save} disabled={saving} type="button">
           {saving ? 'Saving…' : 'Save'}
@@ -194,7 +240,7 @@ export function Breaks() {
       </div>
       <p className="text-sm text-muted mb-6">The first time you click "Test now," your browser will ask permission to show notifications.</p>
 
-      <QuietHoursPanel />
+      <SettingsPanel />
 
       <div className="space-y-4">
         {editingId === 'new' && (
