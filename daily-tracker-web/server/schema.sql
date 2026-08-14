@@ -8,6 +8,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS quiet_hours_enabled BOOLEAN NOT NULL 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS quiet_hours_start TEXT NOT NULL DEFAULT '21:00';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS quiet_hours_end TEXT NOT NULL DEFAULT '08:00';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS quiet_hours_skip_weekends BOOLEAN NOT NULL DEFAULT true;
+-- Mobile keeps its own quiet-hours schedule, independent of desktop/web (quiet_hours_* above).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile_quiet_hours_enabled BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile_quiet_hours_start TEXT NOT NULL DEFAULT '21:00';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile_quiet_hours_end TEXT NOT NULL DEFAULT '08:00';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile_quiet_hours_skip_weekends BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS motivation_enabled BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS motivation_on_startup BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS motivation_interval_min INT NOT NULL DEFAULT 180;

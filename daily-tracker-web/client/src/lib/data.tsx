@@ -25,6 +25,10 @@ export type Settings = {
   quiet_hours_start: string
   quiet_hours_end: string
   quiet_hours_skip_weekends: boolean
+  mobile_quiet_hours_enabled: boolean
+  mobile_quiet_hours_start: string
+  mobile_quiet_hours_end: string
+  mobile_quiet_hours_skip_weekends: boolean
   motivation_enabled: boolean
   motivation_on_startup: boolean
   motivation_interval_min: number
@@ -33,7 +37,17 @@ export type Settings = {
 }
 export type SettingsPatch = Pick<
   Settings,
-  'quiet_hours_enabled' | 'quiet_hours_start' | 'quiet_hours_end' | 'quiet_hours_skip_weekends' | 'motivation_enabled' | 'motivation_on_startup' | 'motivation_interval_min'
+  | 'quiet_hours_enabled'
+  | 'quiet_hours_start'
+  | 'quiet_hours_end'
+  | 'quiet_hours_skip_weekends'
+  | 'mobile_quiet_hours_enabled'
+  | 'mobile_quiet_hours_start'
+  | 'mobile_quiet_hours_end'
+  | 'mobile_quiet_hours_skip_weekends'
+  | 'motivation_enabled'
+  | 'motivation_on_startup'
+  | 'motivation_interval_min'
 >
 
 type DataState = {

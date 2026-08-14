@@ -16,8 +16,13 @@ const MOTIVATION_ID_BASE = 900_000 // reserved ID range, distinct from the hashe
 
 type BreakLike = { id: string; label: string; message: string; enabled: boolean; interval_min: number; last_fired_ts: number }
 type ReminderLike = { id: string; title: string; category: string; time: string; enabled: boolean }
-type QuietSettings = { quiet_hours_enabled: boolean; quiet_hours_start: string; quiet_hours_end: string; quiet_hours_skip_weekends: boolean }
-type SettingsLike = QuietSettings & { motivation_enabled: boolean; motivation_interval_min: number; motivation_last_fired_ts: number }
+type MobileQuietSettings = {
+  mobile_quiet_hours_enabled: boolean
+  mobile_quiet_hours_start: string
+  mobile_quiet_hours_end: string
+  mobile_quiet_hours_skip_weekends: boolean
+}
+type SettingsLike = MobileQuietSettings & { motivation_enabled: boolean; motivation_interval_min: number; motivation_last_fired_ts: number }
 
 export async function requestNativePermission() {
   if (!isNative) return
@@ -42,11 +47,17 @@ export async function scheduleNativeNotifications(breaks: BreakLike[], reminders
 
   const toSchedule: Parameters<typeof LocalNotifications.schedule>[0]['notifications'] = []
   const nowMs = Date.now()
+  const quiet = {
+    quiet_hours_enabled: settings.mobile_quiet_hours_enabled,
+    quiet_hours_start: settings.mobile_quiet_hours_start,
+    quiet_hours_end: settings.mobile_quiet_hours_end,
+    quiet_hours_skip_weekends: settings.mobile_quiet_hours_skip_weekends,
+  }
 
   for (const b of breaks) {
     if (!b.enabled) continue
     const startAt = (b.last_fired_ts || nowMs / 1000) * 1000 + b.interval_min * 60_000
-    futureOccurrences(startAt, b.interval_min * 60_000, settings, nowMs, LOOKAHEAD_MS, MAX_OCCURRENCES).forEach((t, i) => {
+    futureOccurrences(startAt, b.interval_min * 60_000, quiet, nowMs, LOOKAHEAD_MS, MAX_OCCURRENCES).forEach((t, i) => {
       toSchedule.push({ id: hashId(b.id) * 1000 + i, title: b.label, body: b.message, schedule: { at: new Date(t), allowWhileIdle: true } })
     })
   }
@@ -65,7 +76,7 @@ export async function scheduleNativeNotifications(breaks: BreakLike[], reminders
 
   if (settings.motivation_enabled) {
     const startAt = (settings.motivation_last_fired_ts || nowMs / 1000) * 1000 + settings.motivation_interval_min * 60_000
-    futureOccurrences(startAt, settings.motivation_interval_min * 60_000, settings, nowMs, LOOKAHEAD_MS, MAX_OCCURRENCES).forEach((t, i) => {
+    futureOccurrences(startAt, settings.motivation_interval_min * 60_000, quiet, nowMs, LOOKAHEAD_MS, MAX_OCCURRENCES).forEach((t, i) => {
       toSchedule.push({ id: MOTIVATION_ID_BASE + i, title: 'Keep going', body: randomQuote(), schedule: { at: new Date(t), allowWhileIdle: true } })
     })
   }

@@ -3,8 +3,73 @@ import { useData, type Break, type SettingsPatch } from '../../lib/data'
 import { Button, Input, Label } from '../../components/ui'
 
 function toPatch(s: SettingsPatch): SettingsPatch {
-  const { quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_skip_weekends, motivation_enabled, motivation_on_startup, motivation_interval_min } = s
-  return { quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_skip_weekends, motivation_enabled, motivation_on_startup, motivation_interval_min }
+  const {
+    quiet_hours_enabled,
+    quiet_hours_start,
+    quiet_hours_end,
+    quiet_hours_skip_weekends,
+    mobile_quiet_hours_enabled,
+    mobile_quiet_hours_start,
+    mobile_quiet_hours_end,
+    mobile_quiet_hours_skip_weekends,
+    motivation_enabled,
+    motivation_on_startup,
+    motivation_interval_min,
+  } = s
+  return {
+    quiet_hours_enabled,
+    quiet_hours_start,
+    quiet_hours_end,
+    quiet_hours_skip_weekends,
+    mobile_quiet_hours_enabled,
+    mobile_quiet_hours_start,
+    mobile_quiet_hours_end,
+    mobile_quiet_hours_skip_weekends,
+    motivation_enabled,
+    motivation_on_startup,
+    motivation_interval_min,
+  }
+}
+
+function QuietHoursSection({
+  title,
+  description,
+  enabled,
+  start,
+  end,
+  skipWeekends,
+  onChange,
+}: {
+  title: string
+  description: string
+  enabled: boolean
+  start: string
+  end: string
+  skipWeekends: boolean
+  onChange: (patch: { enabled?: boolean; start?: string; end?: string; skipWeekends?: boolean }) => void
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-display text-lg text-ink">{title}</h3>
+        <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
+          <input type="checkbox" checked={enabled} onChange={(e) => onChange({ enabled: e.target.checked })} className="accent-primary" />
+          Enabled
+        </label>
+      </div>
+      <p className="text-sm text-muted mb-4">{description}</p>
+      <div className="flex flex-wrap items-center gap-3 mb-3">
+        <span className="text-sm text-muted">From</span>
+        <Input type="time" value={start} onChange={(e) => onChange({ start: e.target.value })} className="w-32" />
+        <span className="text-sm text-muted">to</span>
+        <Input type="time" value={end} onChange={(e) => onChange({ end: e.target.value })} className="w-32" />
+      </div>
+      <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
+        <input type="checkbox" checked={skipWeekends} onChange={(e) => onChange({ skipWeekends: e.target.checked })} className="accent-primary" />
+        Also skip weekends entirely
+      </label>
+    </div>
+  )
 }
 
 function SettingsPanel() {
@@ -28,47 +93,42 @@ function SettingsPanel() {
 
   return (
     <div className="rounded-2xl border border-line bg-surface p-5 mb-4 space-y-6">
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="font-display text-lg text-ink">Quiet hours</h3>
-          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
-            <input
-              type="checkbox"
-              checked={draft.quiet_hours_enabled}
-              onChange={(e) => setDraft({ ...draft, quiet_hours_enabled: e.target.checked })}
-              className="accent-primary"
-            />
-            Enabled
-          </label>
-        </div>
-        <p className="text-sm text-muted mb-4">
-          Pause break and motivation nudges during this window. Reminders still fire — those are appointments you set for a specific time.
-        </p>
-        <div className="flex flex-wrap items-center gap-3 mb-3">
-          <span className="text-sm text-muted">From</span>
-          <Input
-            type="time"
-            value={draft.quiet_hours_start}
-            onChange={(e) => setDraft({ ...draft, quiet_hours_start: e.target.value })}
-            className="w-32"
-          />
-          <span className="text-sm text-muted">to</span>
-          <Input
-            type="time"
-            value={draft.quiet_hours_end}
-            onChange={(e) => setDraft({ ...draft, quiet_hours_end: e.target.value })}
-            className="w-32"
-          />
-        </div>
-        <label className="flex items-center gap-2 text-sm text-muted cursor-pointer">
-          <input
-            type="checkbox"
-            checked={draft.quiet_hours_skip_weekends}
-            onChange={(e) => setDraft({ ...draft, quiet_hours_skip_weekends: e.target.checked })}
-            className="accent-primary"
-          />
-          Also skip weekends entirely
-        </label>
+      <QuietHoursSection
+        title="Quiet hours — Desktop & Web"
+        description="Pause break and motivation nudges during this window on desktop/web. Reminders still fire — those are appointments you set for a specific time."
+        enabled={draft.quiet_hours_enabled}
+        start={draft.quiet_hours_start}
+        end={draft.quiet_hours_end}
+        skipWeekends={draft.quiet_hours_skip_weekends}
+        onChange={(p) =>
+          setDraft({
+            ...draft,
+            ...(p.enabled !== undefined && { quiet_hours_enabled: p.enabled }),
+            ...(p.start !== undefined && { quiet_hours_start: p.start }),
+            ...(p.end !== undefined && { quiet_hours_end: p.end }),
+            ...(p.skipWeekends !== undefined && { quiet_hours_skip_weekends: p.skipWeekends }),
+          })
+        }
+      />
+
+      <div className="border-t border-line pt-6">
+        <QuietHoursSection
+          title="Quiet hours — Mobile"
+          description="Same idea, scheduled separately for the phone app — so, say, breaks stay silent overnight on mobile while desktop keeps its own hours."
+          enabled={draft.mobile_quiet_hours_enabled}
+          start={draft.mobile_quiet_hours_start}
+          end={draft.mobile_quiet_hours_end}
+          skipWeekends={draft.mobile_quiet_hours_skip_weekends}
+          onChange={(p) =>
+            setDraft({
+              ...draft,
+              ...(p.enabled !== undefined && { mobile_quiet_hours_enabled: p.enabled }),
+              ...(p.start !== undefined && { mobile_quiet_hours_start: p.start }),
+              ...(p.end !== undefined && { mobile_quiet_hours_end: p.end }),
+              ...(p.skipWeekends !== undefined && { mobile_quiet_hours_skip_weekends: p.skipWeekends }),
+            })
+          }
+        />
       </div>
 
       <div className="border-t border-line pt-6">
