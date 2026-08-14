@@ -47,7 +47,7 @@ export async function scheduleNativeNotifications(breaks: BreakLike[], reminders
     if (!b.enabled) continue
     const startAt = (b.last_fired_ts || nowMs / 1000) * 1000 + b.interval_min * 60_000
     futureOccurrences(startAt, b.interval_min * 60_000, settings, nowMs, LOOKAHEAD_MS, MAX_OCCURRENCES).forEach((t, i) => {
-      toSchedule.push({ id: hashId(b.id) * 1000 + i, title: b.label, body: b.message, schedule: { at: new Date(t) } })
+      toSchedule.push({ id: hashId(b.id) * 1000 + i, title: b.label, body: b.message, schedule: { at: new Date(t), allowWhileIdle: true } })
     })
   }
 
@@ -66,7 +66,7 @@ export async function scheduleNativeNotifications(breaks: BreakLike[], reminders
   if (settings.motivation_enabled) {
     const startAt = (settings.motivation_last_fired_ts || nowMs / 1000) * 1000 + settings.motivation_interval_min * 60_000
     futureOccurrences(startAt, settings.motivation_interval_min * 60_000, settings, nowMs, LOOKAHEAD_MS, MAX_OCCURRENCES).forEach((t, i) => {
-      toSchedule.push({ id: MOTIVATION_ID_BASE + i, title: 'Keep going', body: randomQuote(), schedule: { at: new Date(t) } })
+      toSchedule.push({ id: MOTIVATION_ID_BASE + i, title: 'Keep going', body: randomQuote(), schedule: { at: new Date(t), allowWhileIdle: true } })
     })
   }
 
