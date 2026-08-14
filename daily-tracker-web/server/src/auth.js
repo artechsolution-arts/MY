@@ -9,7 +9,7 @@ const COOKIE_OPTS = {
   httpOnly: true,
   sameSite: 'lax',
   secure: process.env.NODE_ENV === 'production',
-  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+  maxAge: 400 * 24 * 60 * 60 * 1000, // 400 days — the max Chrome allows; refreshed below so an active user never hits it
 }
 
 function hashPassword(password) {
@@ -21,7 +21,7 @@ function verifyPassword(password, hash) {
 }
 
 function setSession(res, userId) {
-  const token = jwt.sign({ sub: userId }, SECRET, { expiresIn: '30d' })
+  const token = jwt.sign({ sub: userId }, SECRET, { expiresIn: '400d' })
   res.cookie(COOKIE_NAME, token, COOKIE_OPTS)
 }
 
@@ -35,6 +35,7 @@ function requireAuth(req, res, next) {
   try {
     const payload = jwt.verify(token, SECRET)
     req.userId = payload.sub
+    setSession(res, payload.sub) // sliding expiration — stays logged in indefinitely while actively used
     next()
   } catch {
     return res.status(401).json({ error: 'Session expired' })

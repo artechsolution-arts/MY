@@ -26,20 +26,42 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build installer
-        run: npm run build:win
+      # Auto-update (electron-updater) needs a version that increases every
+      # release. This bump is CI-only -- not committed back to the repo --
+      # so package.json in git stays at its stable base version.
+      - name: Set release version
+        id: version
+        shell: bash
+        run: |
+          VERSION="1.0.${{ github.run_number }}"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Publish to release
+      # electron-builder races when uploading multiple files (exe, blockmap,
+      # latest.yml) to a release that doesn't exist yet, creating duplicate
+      # draft releases and splitting the assets between them. Pre-creating
+      # the (draft) release first means all uploads land in the one release.
+      - name: Pre-create draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          gh release view latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create latest --repo "$GITHUB_REPOSITORY" \
-              --title "DailyTracker (latest build)" \
-              --notes "Automated build from commit $GITHUB_SHA"
-          # DailyTracker.exe (portable, no notifications) retired in favor of an
-          # installer -- required for Windows to register the AppUserModelID
-          # that native toast notifications depend on.
-          gh release delete-asset latest DailyTracker.exe --repo "$GITHUB_REPOSITORY" --yes || true
-          gh release upload latest dist/DailyTracker-Setup.exe --repo "$GITHUB_REPOSITORY" --clobber
+          gh release create "v${{ steps.version.outputs.version }}" --draft \
+            --title "DailyTracker v${{ steps.version.outputs.version }}" \
+            --notes "Automated build from commit $GITHUB_SHA" \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Build and publish installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:win
+
+      # electron-updater's GitHub provider only looks at published releases,
+      # but the GitHub API refuses to create a non-draft release for a tag
+      # that doesn't exist yet -- so the release starts as a draft (above)
+      # and gets published here, once GitHub can create the real tag from it.
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release edit "v${{ steps.version.outputs.version }}" --draft=false --repo "$GITHUB_REPOSITORY"

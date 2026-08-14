@@ -1,4 +1,5 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification } = require('electron')
+const { autoUpdater } = require('electron-updater')
 const path = require('node:path')
 
 const APP_URL = 'https://daily-tracker-web-production.up.railway.app'
@@ -14,6 +15,7 @@ if (process.platform === 'win32') {
 
 let mainWindow = null
 let tray = null
+let updateReady = false
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -45,6 +47,10 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(__dirname, 'preload.js'),
+      // Named persistent partition — removes any ambiguity about the login
+      // session (cookies) surviving app restarts. Written to disk under
+      // userData, same as Electron's unnamed default, just explicit.
+      partition: 'persist:daily-tracker',
     },
   })
 
@@ -60,32 +66,69 @@ function createWindow() {
   })
 }
 
+function rebuildTrayMenu() {
+  const items = [
+    {
+      label: 'Open Daily Tracker',
+      click: () => {
+        mainWindow.show()
+        mainWindow.focus()
+      },
+    },
+  ]
+  if (updateReady) {
+    items.push({
+      label: 'Restart & install update',
+      click: () => {
+        app.isQuitting = true
+        autoUpdater.quitAndInstall()
+      },
+    })
+  }
+  items.push({
+    label: 'Quit',
+    click: () => {
+      app.isQuitting = true
+      app.quit()
+    },
+  })
+  tray.setContextMenu(Menu.buildFromTemplate(items))
+}
+
 function createTray() {
   const trayIcon = nativeImage.createFromPath(ICON_PATH).resize({ width: 16, height: 16 })
   tray = new Tray(trayIcon)
   tray.setToolTip('Daily Tracker')
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      {
-        label: 'Open Daily Tracker',
-        click: () => {
-          mainWindow.show()
-          mainWindow.focus()
-        },
-      },
-      {
-        label: 'Quit',
-        click: () => {
-          app.isQuitting = true
-          app.quit()
-        },
-      },
-    ]),
-  )
+  rebuildTrayMenu()
   tray.on('click', () => {
     mainWindow.show()
     mainWindow.focus()
   })
+}
+
+function setUpAutoUpdate() {
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-downloaded', () => {
+    updateReady = true
+    if (tray) rebuildTrayMenu()
+    if (Notification.isSupported()) {
+      new Notification({
+        title: 'Daily Tracker update ready',
+        body: 'Restart from the tray menu to install it — or it applies next time you quit.',
+        icon: ICON_PATH,
+      }).show()
+    }
+  })
+
+  autoUpdater.on('error', (err) => {
+    console.error('Auto-update check failed:', err)
+  })
+
+  const check = () => autoUpdater.checkForUpdates().catch((err) => console.error('Update check failed:', err))
+  check()
+  setInterval(check, 6 * 60 * 60 * 1000) // re-check every 6 hours while running
 }
 
 ipcMain.on('show-notification', (event, title, body) => {
@@ -107,6 +150,7 @@ app.whenReady().then(() => {
 
   createWindow()
   createTray()
+  setUpAutoUpdate()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
