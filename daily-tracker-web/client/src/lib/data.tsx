@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { api } from './api'
 import { dueBreak, dueReminder, breakProgress, inQuietHours, dueMotivationStartup } from './scheduler'
 import { randomQuote } from './quotes'
+import { isNative, requestNativePermission, fireNativeNow, scheduleNativeNotifications } from './nativeNotify'
 
 export type Break = {
   id: string
@@ -68,6 +69,10 @@ const DataContext = createContext<DataState | null>(null)
 // Only call from a real click handler — browsers require a user gesture to
 // prompt for permission; requesting on page load gets silently suppressed.
 async function notify(title: string, body: string): Promise<'shown' | 'denied' | 'unsupported'> {
+  if (isNative) {
+    await fireNativeNow(title, body)
+    return 'shown'
+  }
   if (typeof window !== 'undefined' && typeof window.electronNotify === 'function') {
     window.electronNotify(title, body)
     return 'shown'
@@ -89,6 +94,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [tick, setTick] = useState(0) // forces the "next break" ring to re-render each second
 
   useEffect(() => {
+    if (isNative) requestNativePermission()
     Promise.all([api.get('/notes'), api.get('/reminders'), api.get('/breaks'), api.get('/settings')])
       .then(([n, r, b, s]) => {
         setNotes(n.content ?? '')
@@ -98,6 +104,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => setLoading(false))
   }, [])
+
+  // Native: keep the OS's scheduled alarms in sync with the latest data, and
+  // re-extend the lookahead window every time the app is reopened.
+  useEffect(() => {
+    if (!isNative || !settings) return
+    scheduleNativeNotifications(breaks, reminders, settings)
+  }, [breaks, reminders, settings])
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000)
@@ -113,7 +126,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
   settingsRef.current = settings
 
   useEffect(() => {
+    if (!isNative) return
+    let remove: (() => void) | undefined
+    import('@capacitor/app').then(({ App }) => {
+      App.addListener('resume', () => {
+        const s = settingsRef.current
+        if (s) scheduleNativeNotifications(breaksRef.current, remindersRef.current, s)
+      }).then((handle) => {
+        remove = () => handle.remove()
+      })
+    })
+    return () => remove?.()
+  }, [])
+
+  useEffect(() => {
     const check = () => {
+      // On native, scheduled OS alarms own firing (see the effect below) — the JS
+      // timer below would double-fire while the app happens to be in the foreground.
+      if (isNative) return
       const now = new Date()
       const nowTs = Date.now() / 1000
       const s = settingsRef.current

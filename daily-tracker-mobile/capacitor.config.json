@@ -1,0 +1,10 @@
+{
+  "appId": "com.artechsolution.dailytracker",
+  "appName": "Daily Tracker",
+  "webDir": "../daily-tracker-web/client/dist",
+  "android": {
+    "buildOptions": {
+      "releaseType": "APK"
+    }
+  }
+}

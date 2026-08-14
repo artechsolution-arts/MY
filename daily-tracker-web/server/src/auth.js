@@ -5,10 +5,13 @@ const SECRET = process.env.JWT_SECRET
 if (!SECRET) throw new Error('JWT_SECRET env var is required')
 
 const COOKIE_NAME = 'token'
+const IS_PROD = process.env.NODE_ENV === 'production'
 const COOKIE_OPTS = {
   httpOnly: true,
-  sameSite: 'lax',
-  secure: process.env.NODE_ENV === 'production',
+  // 'none' is required for the cross-origin mobile app's cookie to be sent at all,
+  // and 'none' itself requires 'secure' — 'lax' + non-secure keeps plain-HTTP local dev working.
+  sameSite: IS_PROD ? 'none' : 'lax',
+  secure: IS_PROD,
   maxAge: 400 * 24 * 60 * 60 * 1000, // 400 days — the max Chrome allows; refreshed below so an active user never hits it
 }
 

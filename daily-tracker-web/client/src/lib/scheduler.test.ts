@@ -1,5 +1,5 @@
 import assert from 'node:assert'
-import { dueBreak, dueReminder, breakProgress, inQuietHours, dueMotivationStartup } from './scheduler.ts'
+import { dueBreak, dueReminder, breakProgress, inQuietHours, dueMotivationStartup, hashId, futureOccurrences } from './scheduler.ts'
 
 assert.strictEqual(dueBreak(0, 20, 20 * 60), true)
 assert.strictEqual(dueBreak(0, 20, 19 * 60), false)
@@ -32,5 +32,27 @@ assert.strictEqual(inQuietHours(weekdayNoon, true, '09:00', '09:00', false), fal
 assert.strictEqual(dueMotivationStartup(null, now), true) // never fired
 assert.strictEqual(dueMotivationStartup('2026-08-12', now), false) // already fired today
 assert.strictEqual(dueMotivationStartup('2026-08-11', now), true) // fired yesterday, due again
+
+assert.strictEqual(hashId('abc'), hashId('abc')) // deterministic
+assert.strictEqual(typeof hashId('abc'), 'number')
+assert.ok(hashId('abc') >= 0 && hashId('abc') < 100_000) // always non-negative, in range
+assert.notStrictEqual(hashId('abc'), hashId('abd')) // different ids hash differently (not a strict guarantee, but true for this pair)
+
+const noQuiet = { quiet_hours_enabled: false, quiet_hours_start: '21:00', quiet_hours_end: '08:00', quiet_hours_skip_weekends: false }
+const nowMs = new Date(2026, 7, 12, 9, 0).getTime() // Wed Aug 12 2026, 09:00
+const hourMs = 60 * 60 * 1000
+
+// three future hourly occurrences starting now
+assert.deepStrictEqual(
+  futureOccurrences(nowMs, hourMs, noQuiet, nowMs, 4 * hourMs, 10),
+  [nowMs + hourMs, nowMs + 2 * hourMs, nowMs + 3 * hourMs, nowMs + 4 * hourMs],
+)
+// maxOccurrences caps the result
+assert.strictEqual(futureOccurrences(nowMs, hourMs, noQuiet, nowMs, 24 * hourMs, 3).length, 3)
+// occurrences at/before nowMs are excluded even if within range
+assert.deepStrictEqual(futureOccurrences(nowMs - hourMs, hourMs, noQuiet, nowMs, hourMs, 10), [nowMs + hourMs])
+// quiet hours skip matching occurrences (10:00 and 11:00 fall inside a 10:00-12:00 quiet window)
+const quiet = { quiet_hours_enabled: true, quiet_hours_start: '10:00', quiet_hours_end: '12:00', quiet_hours_skip_weekends: false }
+assert.deepStrictEqual(futureOccurrences(nowMs + hourMs, hourMs, quiet, nowMs, 4 * hourMs, 10), [nowMs + 3 * hourMs, nowMs + 4 * hourMs])
 
 console.log('OK')

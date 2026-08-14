@@ -1,0 +1,68 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'daily-tracker-mobile/**'
+      - 'daily-tracker-web/client/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install web client dependencies
+        working-directory: daily-tracker-web/client
+        run: npm install
+
+      # The mobile app bundles the web build locally and talks to the live
+      # API directly -- unlike the desktop app, which just loads the live
+      # site, Capacitor needs real assets on disk to package into the APK.
+      - name: Build web client against the live API
+        working-directory: daily-tracker-web/client
+        env:
+          VITE_API_URL: https://daily-tracker-web-production.up.railway.app
+        run: npm run build
+
+      - name: Install mobile project dependencies
+        working-directory: daily-tracker-mobile
+        run: npm install
+
+      - name: Sync Capacitor
+        working-directory: daily-tracker-mobile
+        run: npx cap sync android
+
+      # Debug-signed (Android's auto-generated debug keystore) -- installs
+      # and runs fine via direct APK sideload, which is how this is
+      # distributed. Play Store distribution would need real release signing.
+      - name: Build APK
+        working-directory: daily-tracker-mobile/android
+        run: ./gradlew assembleDebug
+
+      - name: Publish to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          VERSION="1.0.${{ github.run_number }}"
+          TAG="android-v$VERSION"
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --title "DailyTracker Android v$VERSION" \
+            --notes "Automated build from commit $GITHUB_SHA"
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" \
+            "daily-tracker-mobile/android/app/build/outputs/apk/debug/app-debug.apk#DailyTracker.apk"

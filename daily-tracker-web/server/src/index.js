@@ -2,12 +2,18 @@ const path = require('node:path')
 const fs = require('node:fs')
 const express = require('express')
 const cookieParser = require('cookie-parser')
+const cors = require('cors')
 const { pool } = require('./db')
 
 const app = express()
 app.set('trust proxy', 1)
 app.use(express.json())
 app.use(cookieParser())
+// The mobile app's web content is bundled locally and runs from a different
+// origin (Capacitor's default WebView origin), so its API calls are
+// cross-origin -- unlike the website, which is same-origin and unaffected
+// by this either way.
+app.use(cors({ origin: ['https://localhost', 'capacitor://localhost'], credentials: true }))
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))
 app.use('/api/auth', require('./routes/auth'))

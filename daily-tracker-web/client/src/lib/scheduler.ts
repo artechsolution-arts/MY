@@ -44,3 +44,26 @@ export function inQuietHours(now: Date, enabled: boolean, start: string, end: st
   if (startMin < endMin) return curMin >= startMin && curMin < endMin
   return curMin >= startMin || curMin < endMin // window wraps past midnight
 }
+
+/** Deterministic small int from a string ID — used as a stable native-notification ID (Capacitor requires integers). */
+export function hashId(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
+  return Math.abs(h) % 100_000
+}
+
+type QuietSettings = { quiet_hours_enabled: boolean; quiet_hours_start: string; quiet_hours_end: string; quiet_hours_skip_weekends: boolean }
+
+/** Future fire times for an interval-based nudge, skipping quiet hours and capped at maxOccurrences — mobile schedules these natively ahead of time since it can't rely on a JS timer while backgrounded. */
+export function futureOccurrences(startAtMs: number, intervalMs: number, quiet: QuietSettings, nowMs: number, horizonMs: number, maxOccurrences: number): number[] {
+  const times: number[] = []
+  const horizon = nowMs + horizonMs
+  let t = startAtMs
+  while (t <= horizon && times.length < maxOccurrences) {
+    if (t > nowMs && !inQuietHours(new Date(t), quiet.quiet_hours_enabled, quiet.quiet_hours_start, quiet.quiet_hours_end, quiet.quiet_hours_skip_weekends)) {
+      times.push(t)
+    }
+    t += intervalMs
+  }
+  return times
+}
