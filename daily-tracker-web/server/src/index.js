@@ -7,6 +7,14 @@ const { pool } = require('./db')
 
 const app = express()
 app.set('trust proxy', 1)
+// Express auto-ETags every res.json() reply and answers a matching
+// If-None-Match with a bodyless 304. Browsers send that header on repeat
+// GETs whether or not the caller wants caching, so an unchanged /auth/me
+// (nothing to do with actually being logged in) came back as a 304 --
+// which fetch() treats as a failure (res.ok is false), making a perfectly
+// valid session look logged-out. API responses aren't meant to be cached
+// this way; static asset caching below is unaffected (separate mechanism).
+app.disable('etag')
 app.use(express.json())
 app.use(cookieParser())
 // The mobile app's web content is bundled locally and runs from a different
