@@ -7,6 +7,7 @@ import { DashboardLayout } from './pages/dashboard/Layout'
 import { Notes } from './pages/dashboard/Notes'
 import { Reminders } from './pages/dashboard/Reminders'
 import { Breaks } from './pages/dashboard/Breaks'
+import { Widget } from './pages/Widget'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/widget" element={<Widget />} />
           <Route path="/app" element={<DashboardLayout />}>
             <Route index element={<Navigate to="notes" replace />} />
             <Route path="notes" element={<Notes />} />

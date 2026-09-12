@@ -1,10 +1,12 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification } = require('electron')
 const { autoUpdater } = require('electron-updater')
 const path = require('node:path')
+const fs = require('node:fs')
 
 const APP_URL = 'https://daily-tracker-web-production.up.railway.app'
 const ICON_PATH = path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
 const APP_USER_MODEL_ID = 'com.artechsolution.dailytracker'
+const WIDGET_STATE_PATH = path.join(app.getPath('userData'), 'widget-state.json')
 
 // Required for Windows to show native toast notifications at all — without a
 // matching AppUserModelID (normally set up by an installer's Start Menu
@@ -14,8 +16,72 @@ if (process.platform === 'win32') {
 }
 
 let mainWindow = null
+let widgetWindow = null
 let tray = null
 let updateReady = false
+
+function loadWidgetState() {
+  try {
+    return JSON.parse(fs.readFileSync(WIDGET_STATE_PATH, 'utf8'))
+  } catch {
+    return { open: false, bounds: { width: 300, height: 380 } }
+  }
+}
+
+function saveWidgetState(patch) {
+  try {
+    fs.writeFileSync(WIDGET_STATE_PATH, JSON.stringify({ ...loadWidgetState(), ...patch }))
+  } catch (err) {
+    console.error('Could not save widget window state:', err)
+  }
+}
+
+function createWidgetWindow() {
+  if (widgetWindow) {
+    widgetWindow.show()
+    widgetWindow.focus()
+    return
+  }
+  const { bounds } = loadWidgetState()
+  widgetWindow = new BrowserWindow({
+    ...bounds,
+    minWidth: 220,
+    minHeight: 200,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    icon: ICON_PATH,
+    title: 'Daily Tracker Widget',
+    backgroundColor: '#F6FAFB',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'),
+      // Same named partition as the main window — shares its login session,
+      // so opening the widget never asks you to log in separately.
+      partition: 'persist:daily-tracker',
+    },
+  })
+
+  widgetWindow.loadURL(`${APP_URL}/widget`)
+
+  const persistBounds = () => saveWidgetState({ bounds: widgetWindow.getBounds() })
+  widgetWindow.on('moved', persistBounds)
+  widgetWindow.on('resized', persistBounds)
+  widgetWindow.on('closed', () => {
+    widgetWindow = null
+    saveWidgetState({ open: false })
+    rebuildTrayMenu()
+  })
+
+  saveWidgetState({ open: true })
+  rebuildTrayMenu()
+}
+
+function toggleWidgetWindow() {
+  if (widgetWindow) widgetWindow.close()
+  else createWidgetWindow()
+}
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -74,6 +140,10 @@ function rebuildTrayMenu() {
         mainWindow.show()
         mainWindow.focus()
       },
+    },
+    {
+      label: widgetWindow ? 'Hide widget' : 'Show widget',
+      click: toggleWidgetWindow,
     },
   ]
   if (updateReady) {
@@ -151,6 +221,7 @@ app.whenReady().then(() => {
   createWindow()
   createTray()
   setUpAutoUpdate()
+  if (loadWidgetState().open) createWidgetWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

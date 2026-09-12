@@ -46,3 +46,12 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Lets the desktop widget's frameless window be dragged by its header;
+   no-op everywhere else (regular browser windows ignore this property). */
+.app-drag-region {
+  -webkit-app-region: drag;
+}
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
