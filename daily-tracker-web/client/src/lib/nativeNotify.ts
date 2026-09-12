@@ -3,12 +3,20 @@
 // native platforms, notifications are instead scheduled ahead of time via the
 // OS's own alarm system (Capacitor LocalNotifications), refreshed each time
 // the app opens. No-ops entirely on web/desktop (isNative is false there).
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
-import { hashId, futureOccurrences } from './scheduler'
+import { hashId, futureOccurrences, nextReminderOf } from './scheduler'
 import { randomQuote } from './quotes'
 
 export const isNative = Capacitor.isNativePlatform()
+
+// Custom native plugin (android/.../WidgetDataPlugin.java) that caches a
+// small summary for the home-screen widget, which -- being plain native
+// Android views -- can't reach into the WebView's JS/React state itself.
+interface WidgetDataPluginApi {
+  update(options: { reminderText: string; notesPreview: string }): Promise<void>
+}
+const WidgetData = registerPlugin<WidgetDataPluginApi>('WidgetData')
 
 const LOOKAHEAD_MS = 3 * 24 * 60 * 60 * 1000 // re-extended every time the app is opened
 const MAX_OCCURRENCES = 60 // sanity cap — avoids scheduling thousands of alarms if an interval is very short
@@ -82,4 +90,12 @@ export async function scheduleNativeNotifications(breaks: BreakLike[], reminders
   }
 
   if (toSchedule.length) await LocalNotifications.schedule({ notifications: toSchedule })
+}
+
+/** Pushes the small summary the home-screen widget shows — call whenever reminders or today's note change. */
+export async function updateWidget(reminders: ReminderLike[], notesPreview: string) {
+  if (!isNative) return
+  const next = nextReminderOf(reminders, new Date())
+  const reminderText = next ? `${next.time} — ${next.category}: ${next.title}` : 'No reminders set'
+  await WidgetData.update({ reminderText, notesPreview: notesPreview || 'No notes yet.' })
 }

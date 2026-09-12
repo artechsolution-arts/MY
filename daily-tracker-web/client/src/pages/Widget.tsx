@@ -1,25 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../lib/auth'
-import { DataProvider, useData, type Reminder } from '../lib/data'
+import { DataProvider, useData } from '../lib/data'
 import { BreathingRing } from '../components/BreathingRing'
 import { api } from '../lib/api'
-
-/** Soonest reminder from now, wrapping to tomorrow's earliest if none are left today — a glance-friendly ordering, not a firing decision. */
-function nextReminderOf(reminders: Reminder[]): Reminder | null {
-  const enabled = reminders.filter((r) => r.enabled)
-  if (!enabled.length) return null
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
-  const byTime = (r: Reminder) => {
-    const [h, m] = r.time.split(':').map(Number)
-    return h * 60 + m
-  }
-  const sorted = [...enabled].sort((a, b) => byTime(a) - byTime(b))
-  return sorted.find((r) => byTime(r) >= nowMin) ?? sorted[0]
-}
+import { nextReminderOf } from '../lib/scheduler'
 
 function WidgetContent() {
   const { reminders, loading } = useData()
-  const next = useMemo(() => nextReminderOf(reminders), [reminders])
+  const next = useMemo(() => nextReminderOf(reminders, new Date()), [reminders])
   const [notes, setNotes] = useState('')
 
   useEffect(() => {

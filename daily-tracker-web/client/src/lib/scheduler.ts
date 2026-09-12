@@ -67,3 +67,18 @@ export function futureOccurrences(startAtMs: number, intervalMs: number, quiet: 
   }
   return times
 }
+
+type TimedReminder = { time: string; enabled: boolean }
+
+/** Soonest reminder from now, wrapping to tomorrow's earliest if none are left today — a glance-friendly ordering, not a firing decision. */
+export function nextReminderOf<T extends TimedReminder>(reminders: T[], now: Date): T | null {
+  const enabled = reminders.filter((r) => r.enabled)
+  if (!enabled.length) return null
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const byTime = (r: T) => {
+    const [h, m] = r.time.split(':').map(Number)
+    return h * 60 + m
+  }
+  const sorted = [...enabled].sort((a, b) => byTime(a) - byTime(b))
+  return sorted.find((r) => byTime(r) >= nowMin) ?? sorted[0]
+}

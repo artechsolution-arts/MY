@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../../lib/api'
 import { Input } from '../../components/ui'
 import { dateStr } from '../../lib/scheduler'
+import { useData } from '../../lib/data'
+import { updateWidget } from '../../lib/nativeNotify'
 
 export function Notes() {
-  const [date, setDate] = useState(dateStr(new Date()))
+  const { reminders } = useData()
+  const today = dateStr(new Date())
+  const [date, setDate] = useState(today)
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
@@ -31,6 +35,7 @@ export function Notes() {
     timeout.current = window.setTimeout(async () => {
       await api.put('/notes', { date, content: value })
       setStatus(`Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`)
+      if (date === today) updateWidget(reminders, value)
     }, 800)
   }
 

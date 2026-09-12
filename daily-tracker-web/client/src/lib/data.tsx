@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { api } from './api'
 import { dueBreak, dueReminder, breakProgress, inQuietHours, dueMotivationStartup } from './scheduler'
 import { randomQuote } from './quotes'
-import { isNative, requestNativePermission, fireNativeNow, scheduleNativeNotifications } from './nativeNotify'
+import { isNative, requestNativePermission, fireNativeNow, scheduleNativeNotifications, updateWidget } from './nativeNotify'
 
 export type Break = {
   id: string
@@ -121,6 +121,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     scheduleNativeNotifications(breaks, reminders, settings)
   }, [breaks, reminders, settings])
 
+  // Native: keep the home-screen widget's glance card current. Notes are
+  // edited outside this provider now (the journal page owns its own state),
+  // so this only catches up when reminders change or the app resumes —
+  // ponytail: a mid-session note edit won't reach the widget until then,
+  // add a shared notes store if that staleness ever actually bothers someone.
+  useEffect(() => {
+    if (!isNative) return
+    api.get('/notes').then((n) => updateWidget(reminders, n.content ?? ''))
+  }, [reminders])
+
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000)
     return () => clearInterval(id)
@@ -141,6 +151,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       App.addListener('resume', () => {
         const s = settingsRef.current
         if (s) scheduleNativeNotifications(breaksRef.current, remindersRef.current, s)
+        api.get('/notes').then((n) => updateWidget(remindersRef.current, n.content ?? ''))
       }).then((handle) => {
         remove = () => handle.remove()
       })

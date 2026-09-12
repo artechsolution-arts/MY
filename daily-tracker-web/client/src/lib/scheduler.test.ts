@@ -1,5 +1,5 @@
 import assert from 'node:assert'
-import { dueBreak, dueReminder, breakProgress, inQuietHours, dueMotivationStartup, hashId, futureOccurrences } from './scheduler.ts'
+import { dueBreak, dueReminder, breakProgress, inQuietHours, dueMotivationStartup, hashId, futureOccurrences, nextReminderOf } from './scheduler.ts'
 
 assert.strictEqual(dueBreak(0, 20, 20 * 60), true)
 assert.strictEqual(dueBreak(0, 20, 19 * 60), false)
@@ -54,5 +54,14 @@ assert.deepStrictEqual(futureOccurrences(nowMs - hourMs, hourMs, noQuiet, nowMs,
 // quiet hours skip matching occurrences (10:00 and 11:00 fall inside a 10:00-12:00 quiet window)
 const quiet = { quiet_hours_enabled: true, quiet_hours_start: '10:00', quiet_hours_end: '12:00', quiet_hours_skip_weekends: false }
 assert.deepStrictEqual(futureOccurrences(nowMs + hourMs, hourMs, quiet, nowMs, 4 * hourMs, 10), [nowMs + 3 * hourMs, nowMs + 4 * hourMs])
+
+const atNoon = new Date(2026, 7, 12, 12, 0)
+const r9 = { id: 'a', time: '09:00', enabled: true }
+const r14 = { id: 'b', time: '14:00', enabled: true }
+const r18 = { id: 'c', time: '18:00', enabled: false }
+assert.deepStrictEqual(nextReminderOf([r9, r14, r18], atNoon), r14) // 09:00 already passed, 14:00 is next, 18:00 disabled
+assert.deepStrictEqual(nextReminderOf([r9], atNoon), r9) // wraps to tomorrow's earliest when none are left today
+assert.strictEqual(nextReminderOf([r18], atNoon), null) // no enabled reminders
+assert.strictEqual(nextReminderOf([], atNoon), null)
 
 console.log('OK')
