@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthLayout } from '../components/AuthLayout'
-import { Button, Input, Label } from '../components/ui'
+import { Button, Input, Label, PasswordInput } from '../components/ui'
 import { useAuth } from '../lib/auth'
 
 export function Login() {
@@ -35,9 +35,8 @@ export function Login() {
         </div>
         <div>
           <Label htmlFor="password">Password</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             required
             autoComplete="current-password"
             value={password}
