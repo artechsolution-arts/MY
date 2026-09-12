@@ -97,14 +97,17 @@ function MeditationOverlay({ onClose }: { onClose: () => void }) {
         <p className="font-display text-2xl text-ink mb-1">Take a deep breath.</p>
         <p className="text-sm text-muted">In for four. Hold for four. Out for four.</p>
       </div>
-      <iframe
-        width="280"
-        height="158"
-        src="https://www.youtube.com/embed/vPvIxwh9N2w?autoplay=1&loop=1&playlist=vPvIxwh9N2w"
-        title="Meditation music"
-        allow="autoplay; encrypted-media"
-        className="rounded-xl border border-line"
-      />
+      {/* Audio only: kept a real (non-zero) size and just moved off-screen, since
+          display:none/visibility:hidden can make browsers pause the player. */}
+      <div className="absolute -left-[9999px] top-0 w-px h-px overflow-hidden">
+        <iframe
+          width="280"
+          height="158"
+          src="https://www.youtube.com/embed/vPvIxwh9N2w?autoplay=1&loop=1&playlist=vPvIxwh9N2w"
+          title="Meditation music"
+          allow="autoplay; encrypted-media"
+        />
+      </div>
     </div>
   )
 }
