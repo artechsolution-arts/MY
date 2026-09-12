@@ -52,9 +52,6 @@ export type SettingsPatch = Pick<
 
 type DataState = {
   loading: boolean
-  notes: string
-  setNotes: (v: string) => void
-  saveNotes: () => Promise<void>
   reminders: Reminder[]
   addReminder: (r: Omit<Reminder, 'id' | 'last_fired_date'>) => Promise<void>
   updateReminder: (id: string, r: Omit<Reminder, 'id' | 'last_fired_date'>) => Promise<void>
@@ -101,7 +98,6 @@ async function notify(title: string, body: string): Promise<'shown' | 'denied' |
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
-  const [notes, setNotes] = useState('')
   const [reminders, setReminders] = useState<Reminder[]>([])
   const [breaks, setBreaks] = useState<Break[]>([])
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -109,9 +105,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isNative) requestNativePermission()
-    Promise.all([api.get('/notes'), api.get('/reminders'), api.get('/breaks'), api.get('/settings')])
-      .then(([n, r, b, s]) => {
-        setNotes(n.content ?? '')
+    Promise.all([api.get('/reminders'), api.get('/breaks'), api.get('/settings')])
+      .then(([r, b, s]) => {
         setReminders(r.reminders ?? [])
         setBreaks(b.breaks ?? [])
         setSettings(s.settings ?? null)
@@ -202,10 +197,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(id)
   }, [])
 
-  const saveNotes = useCallback(async () => {
-    await api.put('/notes', { content: notes })
-  }, [notes])
-
   const addReminder = useCallback(async (r: Omit<Reminder, 'id' | 'last_fired_date'>) => {
     const { reminder } = await api.post('/reminders', r)
     setReminders((prev) => [...prev, reminder])
@@ -263,9 +254,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     <DataContext.Provider
       value={{
         loading,
-        notes,
-        setNotes,
-        saveNotes,
         reminders,
         addReminder,
         updateReminder,

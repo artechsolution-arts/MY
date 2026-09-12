@@ -1,22 +1,23 @@
+import { useState } from 'react'
 import { NavLink, Outlet, Navigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 import { DataProvider, useData } from '../../lib/data'
 import { BreathingRing } from '../../components/BreathingRing'
-import { NotesIcon, ReminderIcon, BreaksIcon } from '../../components/icons'
+import { NotesIcon, BreaksIcon, MoreIcon } from '../../components/icons'
 
 const NAV = [
   { to: '/app/notes', label: 'Notes', Icon: NotesIcon },
-  { to: '/app/reminders', label: 'Reminders', Icon: ReminderIcon },
   { to: '/app/breaks', label: 'Breaks', Icon: BreaksIcon },
+  { to: '/app/more', label: 'More', Icon: MoreIcon },
 ]
 
-export function SidebarNav() {
+export function SidebarNav({ onLogoClick }: { onLogoClick: () => void }) {
   return (
     <aside className="hidden sm:flex w-56 border-r border-line px-4 py-6 flex-col gap-1 shrink-0">
-      <div className="flex items-center gap-2 px-2 mb-6">
+      <button onClick={onLogoClick} className="flex items-center gap-2 px-2 mb-6 cursor-pointer" type="button">
         <BreathingRing size={24} />
         <span className="font-display text-base text-ink">Daily Tracker</span>
-      </div>
+      </button>
       {NAV.map(({ to, label, Icon }) => (
         <NavLink
           key={to}
@@ -37,14 +38,14 @@ export function SidebarNav() {
 
 export function BottomNav() {
   return (
-    <nav className="sm:hidden fixed bottom-0 inset-x-0 z-10 flex border-t border-line bg-surface">
+    <nav className="sm:hidden fixed bottom-4 inset-x-4 z-10 flex justify-between rounded-full border border-line bg-surface shadow-lg px-2 py-1.5">
       {NAV.map(({ to, label, Icon }) => (
         <NavLink
           key={to}
           to={to}
           className={({ isActive }) =>
-            `flex-1 flex flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors ${
-              isActive ? 'text-primary' : 'text-muted'
+            `flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-full text-[11px] font-medium transition-colors ${
+              isActive ? 'bg-primary-tint text-primary-deep' : 'text-muted'
             }`
           }
         >
@@ -56,12 +57,15 @@ export function BottomNav() {
   )
 }
 
-export function Topbar() {
-  const { logout } = useAuth()
+export function Topbar({ onLogoClick }: { onLogoClick: () => void }) {
   const { nextBreak } = useData()
   return (
     <div className="flex items-center justify-between px-5 sm:px-8 py-4 border-b border-line">
-      <div className="flex items-center gap-3 min-w-0">
+      <button onClick={onLogoClick} className="flex items-center gap-2 min-w-0 sm:hidden cursor-pointer" type="button">
+        <BreathingRing size={24} />
+        <span className="font-display text-base text-ink">Daily Tracker</span>
+      </button>
+      <div className="hidden sm:flex items-center gap-3 min-w-0">
         {nextBreak ? (
           <>
             <BreathingRing size={32} progress={nextBreak.progress} />
@@ -73,30 +77,49 @@ export function Topbar() {
           <span className="text-sm text-muted">No breaks scheduled</span>
         )}
       </div>
-      <button onClick={() => logout()} className="text-sm text-muted hover:text-ink transition-colors cursor-pointer shrink-0">
-        Log out
+    </div>
+  )
+}
+
+function MeditationOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-bg flex flex-col items-center justify-center gap-6 px-6">
+      <button
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute top-5 right-5 text-muted hover:text-ink cursor-pointer text-2xl leading-none"
+        type="button"
+      >
+        ×
       </button>
+      <BreathingRing size={220} />
+      <div className="text-center">
+        <p className="font-display text-2xl text-ink mb-1">Take a deep breath.</p>
+        <p className="text-sm text-muted">In for four. Hold for four. Out for four.</p>
+      </div>
     </div>
   )
 }
 
 export function DashboardLayout() {
   const { user, loading } = useAuth()
+  const [meditating, setMeditating] = useState(false)
   if (loading) return null
   if (!user) return <Navigate to="/login" replace />
 
   return (
     <DataProvider>
       <div className="min-h-screen flex">
-        <SidebarNav />
+        <SidebarNav onLogoClick={() => setMeditating(true)} />
         <div className="flex-1 flex flex-col min-w-0">
-          <Topbar />
+          <Topbar onLogoClick={() => setMeditating(true)} />
           <main className="flex-1 p-5 sm:p-8 pb-24 sm:pb-8 max-w-3xl w-full">
             <Outlet />
           </main>
         </div>
         <BottomNav />
       </div>
+      {meditating && <MeditationOverlay onClose={() => setMeditating(false)} />}
     </DataProvider>
   )
 }

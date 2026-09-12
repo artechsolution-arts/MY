@@ -1,32 +1,51 @@
 import { useEffect, useRef, useState } from 'react'
-import { useData } from '../../lib/data'
+import { api } from '../../lib/api'
+import { Input } from '../../components/ui'
+import { dateStr } from '../../lib/scheduler'
 
 export function Notes() {
-  const { notes, setNotes, saveNotes } = useData()
+  const [date, setDate] = useState(dateStr(new Date()))
+  const [content, setContent] = useState('')
+  const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('')
   const timeout = useRef<number | undefined>(undefined)
+  const loadId = useRef(0)
 
   useEffect(() => {
-    return () => window.clearTimeout(timeout.current)
-  }, [])
+    const id = ++loadId.current
+    setLoading(true)
+    setStatus('')
+    api.get(`/notes?date=${date}`).then((d) => {
+      if (loadId.current === id) {
+        setContent(d.content ?? '')
+        setLoading(false)
+      }
+    })
+  }, [date])
+
+  useEffect(() => () => window.clearTimeout(timeout.current), [])
 
   const onChange = (value: string) => {
-    setNotes(value)
+    setContent(value)
     window.clearTimeout(timeout.current)
     timeout.current = window.setTimeout(async () => {
-      await saveNotes()
+      await api.put('/notes', { date, content: value })
       setStatus(`Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`)
     }, 800)
   }
 
   return (
     <div className="flex flex-col h-full">
-      <h1 className="font-display text-2xl text-ink mb-4">Notes</h1>
+      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <h1 className="font-display text-2xl text-ink">Journal</h1>
+        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-auto" aria-label="Journal date" />
+      </div>
       <textarea
-        value={notes}
+        value={content}
+        disabled={loading}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Jot the thing down before it slips your mind…"
-        className="flex-1 min-h-[60vh] w-full rounded-2xl border border-line bg-surface p-5 text-sm leading-relaxed text-ink placeholder:text-muted/60 focus:border-primary outline-none resize-none font-mono"
+        className="flex-1 min-h-[60vh] w-full rounded-2xl border border-line bg-surface p-5 text-sm leading-relaxed text-ink placeholder:text-muted/60 focus:border-primary outline-none resize-none font-mono disabled:opacity-60"
       />
       <p className="text-xs text-muted mt-2 text-right h-4">{status}</p>
     </div>

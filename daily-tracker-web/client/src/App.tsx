@@ -5,8 +5,8 @@ import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { DashboardLayout } from './pages/dashboard/Layout'
 import { Notes } from './pages/dashboard/Notes'
-import { Reminders } from './pages/dashboard/Reminders'
 import { Breaks } from './pages/dashboard/Breaks'
+import { More } from './pages/dashboard/More'
 import { Widget } from './pages/Widget'
 
 export default function App() {
@@ -21,8 +21,9 @@ export default function App() {
           <Route path="/app" element={<DashboardLayout />}>
             <Route index element={<Navigate to="notes" replace />} />
             <Route path="notes" element={<Notes />} />
-            <Route path="reminders" element={<Reminders />} />
             <Route path="breaks" element={<Breaks />} />
+            <Route path="more" element={<More />} />
+            <Route path="reminders" element={<Navigate to="/app/more" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

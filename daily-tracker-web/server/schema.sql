@@ -19,11 +19,40 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS motivation_interval_min INT NOT NULL 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS motivation_last_fired_date TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS motivation_last_fired_ts DOUBLE PRECISION NOT NULL DEFAULT 0;
 
+-- Upgrade path from one-blob-per-user notes to a per-day journal: existing
+-- content becomes today's entry so nothing is lost. Safe to run on every
+-- boot: a no-op once migrated (checked via the 'date' column's presence).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'notes')
+     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notes' AND column_name = 'date') THEN
+    ALTER TABLE notes RENAME TO notes_legacy;
+
+    CREATE TABLE notes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      content TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (user_id, date)
+    );
+
+    INSERT INTO notes (user_id, date, content, updated_at)
+      SELECT user_id, to_char(now(), 'YYYY-MM-DD'), content, updated_at FROM notes_legacy WHERE content <> '';
+
+    DROP TABLE notes_legacy;
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS notes (
-  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,
   content TEXT NOT NULL DEFAULT '',
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, date)
 );
+CREATE INDEX IF NOT EXISTS notes_user_id_date_idx ON notes(user_id, date);
 
 CREATE TABLE IF NOT EXISTS reminders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

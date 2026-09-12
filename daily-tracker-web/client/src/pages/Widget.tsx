@@ -1,7 +1,8 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../lib/auth'
 import { DataProvider, useData, type Reminder } from '../lib/data'
 import { BreathingRing } from '../components/BreathingRing'
+import { api } from '../lib/api'
 
 /** Soonest reminder from now, wrapping to tomorrow's earliest if none are left today — a glance-friendly ordering, not a firing decision. */
 function nextReminderOf(reminders: Reminder[]): Reminder | null {
@@ -17,8 +18,13 @@ function nextReminderOf(reminders: Reminder[]): Reminder | null {
 }
 
 function WidgetContent() {
-  const { notes, reminders, loading } = useData()
+  const { reminders, loading } = useData()
   const next = useMemo(() => nextReminderOf(reminders), [reminders])
+  const [notes, setNotes] = useState('')
+
+  useEffect(() => {
+    api.get('/notes').then((d) => setNotes(d.content ?? ''))
+  }, [])
 
   if (loading) return null
 
